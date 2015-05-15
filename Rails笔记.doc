@@ -1,0 +1,249 @@
+﻿rails generate controller controller_name 产生一个空的Controller文件夹
+rails generate model model_name  name:string  产生一个空的model文件夹
+在config/routes.rb加一个路由
+get “welcome” => “welcome#index” 将localhost:3000/welcome 对应到welcome Controller 的index #index Action
+Time 是ruby内建的时间类别，<%=Time.now %>会输出当前时间 
+root :to => “welcome#index” 设定主页welcome Controller的index Action为主页
+rails generate scaffold Person name:string birthday:date 利用代码生成器生成一个项目
+rake db:migrate 迁移数据库，创建数据库表
+ruby  -w  文件名    检查文件的语法时候有错误
+ruby  hello.rb 运行
+object_id 返回编号
+symbol 的主要用途是当作hash的键
+super 和 super() 有区别 注意参数数量
+(1..3).inject(0) {|sum,n| sum+n}   block中的两个参数是有含义的。第一个参数sum在inject第一次执行block时把inject带的参数付值给它，n就是数 组中的元素，该例中inject一共执行4次block，每次执行block完后，最后语句的结果再付值给sum，如此循环，直到遍历数组中所有元素
+file = File.new(“testfile”,”r”)
+ 处理语句……
+file.close
+
+File.open(“testfile”,”r”) do |file|   代码块执行完后自动关闭file
+处理语句……
+end
+参数尾巴的hash可以省略{ }
+object.methods 取得这个对象的方法
+object.respond_to? ：method name  判断对象是否拥有该方法
+
+rails generate migration migrate_name  在db/migrate下产生一个迁移文件
+form_for 用来建立一个HTML表单
+create表单
+<%= form_for @event, :url => { :controller => 'events', :action =>
+'create' } do |f| %>
+<%= f.label :name, "Name" %>
+<%= f.text_field :name %>
+<%= f.label :description, "Description" %>
+<%= f.text_area :description %>
+<%= f.submit "Create" %>
+<% end %>
+controller的create action
+def create
+@event = Event.new(params[:event])
+@event.save
+redirect_to :action => :index
+end
+show 表单
+<%= @event.name %>
+<%= simple_format(@event.description) %>
+<p><%= link_to 'Back to index', :controller => 'events', :action =>
+'index' %></p>
+controller的show action
+def show
+@event = Event.find(params[:id])
+end
+edit表单
+<%= form_for @event, :url => { :controller => 'events', :action =>
+'update', :id => @event } do |f| %>
+<%= f.label :name, "Name" %>
+<%= f.text_field :name %>
+<%= f.label :description, "Description" %>
+<%= f.text_area :description %>
+<%= f.submit "Update" %>
+<% end %>
+edit action
+def edit
+@event = Event.find(params[:id])
+end
+
+update action
+def update
+@event = Event.find(params[:id])
+@event.update_attributes(params[:event])
+redirect_to :action => :show, :id => @event
+end
+
+destory  action
+def destroy
+@event = Event.find(params[:id])
+@event.destroy
+redirect_to :action => :index
+end
+
+Layout可以用来包含模版，让不同的样版的html共用相同的开头和结尾
+before_filter 可以定义show edit update destory 中公有的部分
+render :action => “new” 会回传new action 的所有的模版，而不是执行new action 这个方法，如果是redirect_to会让浏览器重新定向到new action 即再发一个request 请求
+分页  在gemfile中加入gem “kaminari” ，gemfile是指定要下载哪写套件
+def index
+@events = Event.page(params[:page]).per(5)
+end
+在html文件中加入<%= paginate @events %>
+命名路由的七个action,rails是订好的，无法修改
+show、new、edit、update、destroy 是一元素操作
+index、create 是群集操作
+
+_path 结尾是相对地址，_url结尾是完整的路径
+<%= button_to 'delete', event_path(event), :method => :delete %> 
+非get操作可以把link_to改成button_to，link_to在javascript没开，就无法送出get之外的操作，button_to 可以
+<%= form_for @event, :url => event_path(@event), :method => :put do |f| %> 
+
+respond_to可以在同一个action中支持不同格式的资料格式
+bundle exec  rake stats 自动代码统计
+在views使用debug  <%= debug(@event) %>会输出@event这个值的详细内容
+$ >"Business".singularize
+$ > "moose".pluralize => "mooses" # 转复数
+bundler会根据gemfile的设定自动下载及安装gem套件，每次修改了gemfile，都要执行bundle install 检查并安装这些函数库，在gemfile.lock 会列出所有使用的套件的版本
+bundle update gem_name 一次升级一个套件
+bundle outdated 会列出可升级的套件
+类名用大写，单数，没有下划线，model的文件名用小写，单数，用下划线，数据库表名用大写复数
+典型路由
+match '/:controller(/:action(/:id))(.format)'
+六种路径：
+match '/:controller'
+match '/:controller/:action'
+match '/:controller/:action/:id'
+match '/:controller.:format'
+match '/:controller/:action.:format'
+match '/:controller/:action/:id.:format'
+render用来回传结果
+render :action => "long_goal", :layout => "spectacular"
+render :partial => "person", :locals => { :name => "david" }
+render :template => "weblog/show", :locals => {:customer => Customer.new}
+render :file => "c:/path/to/some/template.erb", :layout => true, :status => 404
+render :text => "Hi there!", :layout => "special"
+render :text => proc { |response, output| output.write("Hello from code!") }
+render :xml => {:name => "David"}.to_xml
+render :json => {:name => "David"}.to_json, :callback => 'show'
+render :inline => "<%= 'hello ' + name %>", :locals => { :name => "david" }
+render :js => "alert('hello')"
+render :xml => post.to_xml, :status => :created, :location => post_url(post)
+
+redirect_to 不需要传值直接跳转到别页
+respond_to用来回应不同的资料格式
+send_data 用来传二进制字串
+操作session :session[:cart] = Cart.new
+cookies的一些操作
+cookies[:user_name] = "david"
+
+def change
+	create_table :categories do |t|
+		t.string :name
+		t.integer :position
+		t.timestamps
+		end
+	     add_column :events, :category_id, :integer
+		add_index :events, :category_id
+	end
+end
+rails g migration migration_name创建一个数据库迁移文件
+：string 有限长度字符串
+：text 不限长度文字
+：integer  整数
+：float 浮点数
+：datetime 日期时间
+：timestamp 时间戳
+：date 日期
+：time  时间
+ : null 是否允许NULL，默认是允许
+ : limit 用于string、text、integer、binary 指定最大值
+一对一
+class Event < ActiveRecord::Base
+has_one :location # 單數
+#...
+end
+class Location < ActiveRecord::Base
+belongs_to :event # 單數
+end
+一对多
+class Event < ActiveRecord::Base
+has_many :attendees # 複數
+#...
+end
+class Attendee < ActiveRecord::Base
+belongs_to :event # 單數
+end
+多对多
+class Event < ActiveRecord::Base
+has_many :event_groupships
+has_many :groups, :through => :event_groupships
+end
+class EventGroupship < ActiveRecord::Base
+belongs_to :event
+belongs_to :group
+end
+class Group < ActiveRecord::Base
+has_many :event_groupships
+has_many :events, :through => :event_groupships
+end
+link_to
+link_to “About” , :controller=>” ” , action=>” ”, :id=>
+redirect_to
+redirect_to :action=>”edit”, :id=>7  会发送新的请求
+format.html	{redirect_to(@user)}	#跳转到index 页面
+redirect_to “http://www.baidu.com”
+redirect_to “/images/1.jpg”
+redirect_to :back 返回上一次访问页面
+render
+render  :text=>”hello” 显示输出给用户，显示在页面上
+render  (:action=>:index) 只寻找index页面，不执行对应的action，不会向浏览器发送新的请求，仍然使用当前请求的参数和变量
+render  (:template=>"test/index") 显示 index.rhtml 模板
+render  (:file=>”F:/index.rhtml”) 显示指定文件
+render  (:file=>”test/index”, :user_full_path=>true) 显示文件,参数 2 表示用相对路径
+render  (:nothing=>true) 显示一个空页面
+
+flash[:myname]= ‘chengang’
+Cookie 
+cookies[:name] = “chengang”
+cookies[:current_time] = Time.now.to_s
+cookies[:key1] = {:value=>”four”, :expires=>10.days.from_now} 此 10 天后过期
+params对象
+是一个hash对象，用于封装传递到action方法的参数，可以用params[:id]或
+params['id']取值
+
+如果在 controller AAA中新建了一个action BBB，但  http://localhost:3000/AAA/BBB 却报错 Couldn 't find AAA with ID=BBB
+打开config/routes.rb 文件添加url路径
+map.connect"AAA/BBB",:controller=>'AAA',:action=>‘BBB‘ 
+map.resources:AAA #如果原来已有这句话，一定要放在上一句的后面
+Rails将Session对象的数据保存到客户端，服务器端只保存SessionID
+Session[:orderid] = “abc”
+Session[:orderid] = nil
+Reset_session方法复位整个Session
+text_field、password_field、submit_tag的用法
+uname = params[:user][:name] ???????
+<p id=”notice” ><%=notice %> </p>
+当前用户：<%= session[:username] %>，现在时间是：<%= Time.now.strftime(“%Y-%m-%d %H:%M:%S”)%>
+cookies[:cookieName] = “abc”
+cookies[:cookieName] = {:value => cookieValue,:expires => Time.now+3600 }设置有效期
+cookies.delete  :cookieName 删除指定cookie
+全局变量一般定义在config\environment.rb
+
+flash[:notice ] = “成功”
+redirect_to post_path(@post)
+等同于：redirect_to posts_path(@post), :notice => “成功”
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

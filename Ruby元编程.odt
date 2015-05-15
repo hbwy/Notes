@@ -1,0 +1,675 @@
+一、对象模型
+1.打开类：
+	可以有同名类，后者方法会合并到前者中
+2.猴子补丁：
+	同名方法会被覆盖，有利有弊
+	obj.class 输出对象的类型
+	obj.superclass获得对象的超类
+	obj.instance_variables 对象包含的实例变量
+	不能直接访问一个类的实例变量
+	obj.methods 对象包含的方法
+	类名.instance_methods 得到类的实例方法
+	obj.methods.grep(/my/)  抓取方法名包含my的方法 grep 的参数是一个正则表达式
+    obj.object_id  获得对象唯一标识
+3.区分实例变量（默认是私有的），类变量，实例方法（默认是共有的），类方法
+4.任何以大写字母开头的引用（包括类名，模块名）都是常量
+5.像Rake仅仅用来充当常量容器的模块，被称为命名空间
+	module Rake
+		class Task
+			...
+6.常量
+	M.constants 返回当前范围内的常量
+	Module.constants 返回当前程序中所有的顶级常量，包括类名
+
+7.
+.superclass
+MyClass --> Object --> BasicObject
+Class --> Module --> Object --> BasicObject
+
+.class
+MyClass Class Module Object BasicObject 的.class都是Class
+
+8.类名和Module名不能重复
+9.字类E.ancestors可以得到类的祖先链
+	E
+	D
+	Object
+	Kernel
+	BasicObject
+10.Ruby中用self表示当前对象,在类和模块中，self由这个类或模块担任
+11.当开始运行Ruby程序时，Ruby解释器会创建一个名为main的对象作为当前对象，即顶级上下文，因为处在调用堆栈的顶层，这时要么没有调用任何方法，要么调用的所有方法都已经返回了
+12.private方法
+	对象x和对象y都是同一个类的对象，x不能调用y的私有方法，但是x可以调用父类的私有方法
+13.没有明确指定接收者的调用都会作用于self(接收者就是调用该方法的对象)
+14.对象模型小结：
+	对象由一组实例变量和一个类的引用组成
+	对象的方法存在于对象所属的类中，即实例方法
+	类本身是Class类的对象，类的名字不过是一个常量而已
+	Class类是Module的子类
+	常量像文件系统一样，是按照树形结构组织的，其中模块和类的名字扮演着目录的角色，其他普通的常量扮演文件的角色
+	每个类都有一个祖先链，这个链从自己所属的类开始，向上直到BasicObject类结束
+	当调用一个方法时，Ruby首先向右一步来到接收者所属的类，然后一直向上查找祖先链，直到找到该方法，或者达到链的顶端为止
+	当类包含一个模块时，该模块会被插入到祖先链中，位置在该类的正上方
+	当调用一个方法时，接收者会扮演self角色
+	当定义一个模块或类时，该模块或类扮演self角色
+	实例变量永远被认定为self的实例变量
+	任何没有明确指定接收者的方法调用，都当成是调用self的方法
+
+二、动态方法（主要是代码重构和优化）
+1.动态调用方法
+	Object.send(:my_method,3)调用my_method方法
+	第一个参数是被调用的方法名，一般使用符号，剩下的参数会直接传递给调用方法
+2.动态定义方法
+	利用define_method()方法定义一个实例方法，只需要为其提供一个方法名和一个充当方法主体的块
+	class MyClass
+		define_method :my_method do |my_arg|
+			my_arg * 3
+		end
+	end
+	obj = MyClass.new
+	obj.my_method(2)
+	利用Object#define_method()的方法定义一个单件方法
+	空格可以取代括号
+	使用内省（Introspection）的方式缩减代码
+3.method_missing
+	最初的接收者都有一个私有的method_missing方法，当找不到方法时会调用该方法报错
+4.幽灵方法
+	就是并没有定义的方法，只是在调用到该方法时根据某种规则动态产生的方法
+5.动态代理
+	一个捕获幽灵方法调用并把它转发给另一个对象的对象，称为动态代理，下面anne是一个代理，anne会把自己无法识别的方法转发给它封装的Assistant对象frank
+	frank = Assistant.new(“Frank”)
+	anne = Manager.new(frank)
+	anne.attend_metting
+	anne.read_email
+	当一个幽灵方法和一个真实方法发生名字冲突时，后者会胜出，
+	Module#undef_method它会删除所有的（包括继承来的）方法
+	Module#remove_method它会删除接收者自己的方法，而保留继承来的方法
+6.双下划线打头的方法是Ruby内部使用的，不能重、重新定义或删除
+7.白板
+	Ruby 1.9 开始，Object类有一个名叫BasicObject的超类，它只提供几个基本的方法，默认情况下，类还是从Object继承，从BasicObject继承来的类会自动成为白板类，在动态代理中删除绝大多数继承来的方法，就是白板类，它所拥有的方法比object类还要少
+三、代码块
+1.块的最后一行代码执行的结果会被作为返回值
+2.Kernel#block_given?()  询问当前的方法是否包含块
+	def a_method
+	return yield if block_given?
+	'no block'
+	end
+	a_method   #no block
+	a_method {“here is a block'}  #  here is a block
+3.当定义一个块时，它会获取当时环境中的绑定，在把块传给方法时，它会带着这些绑定一起进入该方法，可以在块内部定义额外的绑定，但是这些绑定在块结束时就会消失
+4.在java中，在内部作用域中可以看到”外部作用域”中的变量，但ruby中没有这种嵌套式的作用域，一旦进入新的作用域，原来的绑定就被替换成一组新的绑定
+5.作用域门
+	程序在三个地方会关闭前一个作用域，同时打开一个新的作用域：
+	类定义 class  模块定义 module 方法 def
+	每个关键字充当了一个作用域门
+6.只要main对象在扮演self的角色，就可以访问一个顶级实例变量，但是当其他对象成为self，顶级实例变量就退出作用域了
+7.如果要让一两个绑定穿越作用域门，那么可以用方法调用代替作用域门，用一个闭包获得当前的绑定，并把这个闭包传递给该方法，可以用Class.new(0方法代替class，使用Module.new代替module，以及使用
+Module#define_method(）代替def，这就形成一个扁平作用域，如果在作用域中定义多个方法，则这些方法可以用一个作用域门进行保护，并共享绑定，即共享作用域
+	扁平作用域：
+	my_var = “Success”
+	MyClass = Class.new  do
+		puts “#{my_var} in the class”
+		define_method :my_method do
+			puts ”#{my_var} in the method”
+		end
+	end
+	MyClass.new.my_method
+	共享作用域：
+	def my_methods
+		shared = 0
+		Kernel.send  :define_method, :counter do
+		shared
+		end
+		Kernel.send  :define_method, :inc do |x|
+		shared += x
+		end
+	end
+8.instance_eval()它在一个对象的上下文中执行一个块
+	class MyClass
+		def initialize
+		@v = 1
+		end
+	end
+	obj = MyClass,new
+	obj.instance_eval  do
+		self
+		@v
+	end
+把传给instance_eval方法的块称为上下文探针
+9.Proc对象
+一个proc就是一个转换成对象的块
+可以通过Proc.new创建一个Proc，用Proc#call(）调用块对象
+inc = Proc.new {|x|  x+1}
+inc.call(2)
+用内核方法lambda()和proc()也可以把块转化为Proc对象
+dec = lambda {|x| x+1}
+dec.call(2)
+10.用&符号可以把Proc对象转化成块
+	def math(a,b,&p)
+	yield(a,b)
+	end
+	math(2,3)  {|x,y| x*y}
+11.lambda和proc的区别：
+	在lambda中return只是从lambda中返回；在proc中return是从定义proc的作用域返回，即把proc的返回值	作为整个作用域的返回值，所以proc#call后面的语句不能被执行
+	lambda的适应能力比proc差，如果调用lambda时的参数数量不对，它会失败，同时抛出ArgumentError
+错误，而proc会把传递来的参数调整为自己期望的参数形式
+12.object#method()方法可以获得一个用Method对象表示的方法，可以用Method#call()调用，Method对象类似于lambda
+
+四、类定义
+1. 类定义也会返回最后一条语句的值
+2. 每当通过class关键字打开一个类（或通过module关键字来打开一个模块）时，这个类就是当前类
+3. Module#class_eval()方法会在一个已存在类的上下文中执行一个块
+def  add_method_to (a_class)
+a_class.class_eval  do
+def m ; “hello” ;end
+			end
+		end
+	add_method_to  String
+	“abc”.m
+4. class_eval()实际上是重新打开该类，就像class关键字所做的一样，它可以会对任何代表类的变量使用class_eval方法，而class只能使用常量，而且，class会打开一个新的作用域，这样将丧失当前绑定的可见性，而class_eval使用扁平作用域，意味着可以引用class_eval块外部作用域中的变量
+5. 类实例变量和类的对象的实例变量的区别
+		class MyClass
+			@my_var = 1
+			def  self.read;  @my_var ;end
+			def  write; @my_var = 2;end
+			def  read; @my_var ;end
+		end
+		obj = MyClass.new
+		obj.write
+		obj.read 	#2
+		MyClass.read		#1
+		第一个@my_var是定义在MyClass充当self的时刻，因此它是MyClass的类实例变量，第二个@my_var是定义在obj充当self的时刻，因此它是类的对象的实例变量，类实例变量仅仅可以被类本身所访问，而不能被类的实例或子类所访问，类实例变量只能通过类方法访问，类的对象的实例变量可以通过类的实例方法访问
+6. 类变量
+类变量和类实例变量不同，它们可以被子类或类的实例所使用（类似java里的静态变量）
+但是绝大多数的Ruby主义者都避免使用类变量，而尽量使用类实例变量
+class M
+  @@a = 1
+  def method
+    puts @@a
+  end
+end
+m = M.new
+m.method      	# 1
+
+
+class M
+  @a = 2
+  def method
+    puts @a
+  end
+   def self.method
+    puts @a
+   end
+end
+m = M.new
+m.method  		# nil
+M.method		#2
+7. 单件方法
+问号结尾的方法返回一个boolen类型值，叹号结尾的方法表明会改变原来的对象
+def title?
+	@text.upcase == @text
+end
+类也是对象，只不过类名是常量，对象名是变量而已，类方法的实质就是它们是类的单件方法
+def object.method
+#方法体
+end
+object可以是对象引用（对象的单件方法），可以是常量（类方法），或是self
+8.类宏
+所有的attr_*()方法都定义在Module类中，在类和模块中都可以使用，像attr_accessor()方法这样的方法称为类宏
+9.Eigenclass
+Eigenclass是一个隐藏类，用于存放单件方法，类方法
+去的Eigenclass的方法
+obj = Object.new
+eigenclass = class << obj
+	self
+end
+eigenclass.class   		#Class
+方法查找的顺序：obj --> #obj(存放单件方法的eigenclass) --> D --> C --> Object
+.class不知道eigenclass的存在
+eigenclass的用处：添加专属MyClass的属性
+class MyClass
+	class << self
+		attr_accessor :c
+	end
+end
+当类包含一个模块时，它获得的是该模块的实例方法，而不是类方法，类方法存在于模块的eigenclass中，无法触碰
+10.类扩展
+module MyModule
+  def my_method
+    "hello"
+  end
+end
+class MyClass
+  class << self
+    include MyModule
+  end
+end
+puts MyClass.my_method
+my_method()是MyClass的eigenclass的一个实例方法，这样，my_method也是MyClass的一个类方法，这成为类扩展
+11.对象扩展
+module MyModule
+  def my_method
+    "hello"
+  end
+end
+obj = Object.new
+  class << obj
+    include MyModule
+  end
+obj.my_method
+obj.singleton_methods		#[:my_method]
+用Object#extend实现类扩展，对象扩展
+module MyModule
+  def my_method
+    "hello"
+  end
+end
+
+obj = Object.new
+obj.extend MyModule
+obj.my_method
+
+class MyClass
+  extend MyModule
+end
+MyClass.my_method
+12. 别名
+使用alias关键字给方法命别名
+def my_method 
+	“my_method”
+end
+alias	  :m  :my_method
+也可以使用Module#alias_method()方法
+alias_method	:m, :my_method
+使用环绕别名
+给方法定义一个别名，重定义这个方法，在新的方法中调用老的方法
+
+
+五.编写代码的代码
+Kernel#eval()会执行字符串中的代码
+eval(statements,@binding,file,line)
+class MyClass
+  def my_method
+    @x = 1
+    binding
+  end
+end
+b = MyClass.new.my_method
+puts eval "@x",b
+
+六.Rails应用元编程
+1.包含一个模块可以完成以下事情
+	在类中包含模块，该模块中的方法会成为这个类的实例方法
+	在类的eigenclass中包含模块，该模块的方法会成为这个类的类方法（也可以用extend）
+	在任意对象的eigenclass中包含模块，该模块的方法会成为这个对象的单件方法（也可以用extend）
+
+七.常见惯用法
+1.拟态方法
+如果一个方法把自己伪装成另一个东西，则可称为拟态方法 比如(大多是省略括号的情况)：puts  ,  
+obj.my_attribute=
+为了避免歧义，给当前对象的属性赋值时，应该总是显示的使用self
+2.空指针保护，可以确保一个变量的值不是nil
+a ||= [] 是a = a || [] 的缩写
+3.有名参数
+把一个哈希对象作为参数传给方法，被调方法要自己负责从哈希表中抽取所需参数
+def my_method(args)
+	args
+end
+my_method(:a => 'X', :b => 3)
+以下两种方式等效
+login(:name => 'bill' , :code => 45 )
+login(name: 'bill' , code: 45 )
+4.参数数组和默认值
+*操作符可以把多个参数收集到一个数组中，这种惯用法称为方法数组，一个方法只能有一个参数数组
+def my_method(*args)
+	args
+end
+my_method(1,'2','three')
+5.参数默认值
+def my_method(x,y = “a default value”)
+end
+
+6.Self Yield
+对象把自身传给一个块
+spac = Gem::Specification.new do |s|
+	s.name = “bill”
+	s.version = “2.3”
+end
+
+技巧汇总
+1.数组参数
+把数组参数压入到一个数组中
+def my_method(*args)
+	args.map { |arg| arg.reverse}
+end
+my_method('abc','xyz')  #[“cba”,”zyx”]
+
+2.环绕别名
+从一个重新定义的方法中调用原始的、被重命名的版本
+class String
+	alias	   :old_reverse  :reverse
+	def reverse
+		“x#{old_reverse}x”
+	end
+end
+“abc”.reverse   #”xcbax”
+3.白板
+移除一个对象的所有方法，以便把他们转换成幽灵方法
+class C
+	def method_missing(name,*args)
+		“a Ghost Method”
+	end
+end
+obj = C.new
+obj.to_s 		#<C:0x32435>
+class C
+	instance_methods.each  do|m|
+		undef_method unless m.to_s =~ /method_missing|respond_to?|^/
+	end
+end
+obj.to_s		#”a Ghost Method”
+
+respond_to?实现判断对象能否响应给定的消息
+obj = Object.new
+if obj.respond_to?(“talk”)
+	obj.talk
+else
+	puts “sorry”
+end
+
+4.类扩展
+通过向类的eigenclass中混入模块来定义类方法（是对象扩展的特例）
+class C : end
+module M
+	def my_method
+		'aclass method'
+	end
+end
+class<<C
+	include M
+end
+C.my_method
+5.类扩展混入
+使一个模块可以通过钩子方法扩展他的包含者
+6.类实例变量(只能通过类方法访问)
+在一个Class对象的实例变量中存储类级别的状态
+class C
+	@variable=”some value”
+	def  self.class_attribute
+		@variable
+	end
+end
+C.class_attribute
+6.类宏
+在类定义中使用一个类方法
+class C;end
+class<<C
+	def my_macro(arg)
+		“#{arg}
+	end
+end
+class C
+	my_macro :x
+end
+7.洁净室
+使用对象作为执行块的上下文环境
+class CleanRoom
+	def method(x)
+		x*2
+	end
+end
+CleanRoom.new.instance_eval {method(3)}		# 6
+8.代码处理器
+处理从外部获得的字符串代码
+File.readlines(“a _file_containing_lines_of_ruby.txt”).each do| line |
+	puts “#{line.chomp} ==> #{eval(line) }”
+end
+#1+1==>2
+#3*2==>6
+Math.log10(100) ==> 2.0
+9.上下文探针
+执行块来获取对象上下文中的信息
+class C
+	def initialize
+		@x = “a private instance”
+	end
+end
+obj = C.new
+obj.instance_eval { @x }
+10.延迟执行
+在proc或lambda中存储一段代码及其上下文，用于以后执行
+class C
+	def store(&block)
+		@my_code_capsule = block
+	end
+	def execute
+		@my_code_capsule.call
+	end
+end
+obj = C.new
+obj.store {$x = 1}
+obj.execute
+11.动态派发
+在运行时决定调用哪个方法
+method_to_call = :reverse
+obj = “abc”
+obj.send(method_to_call)	=>”cba”
+12.动态方法
+在运行时才决定如何定义一个方法
+class C 
+end
+C.class_eval do
+	define_method :my_method do
+		“a dynamic method”
+	end
+end
+obj = C.new
+obj.my_method
+13.动态代理
+把不能对应某个方法的名的消息转发给另一个对象
+class MyDynamicProxy
+	def initialize(target)
+		@target = target
+	end
+	def method_missing(name,*args,&block)
+		“result:#{@target.send(name,*args,&block)}”
+	end
+end
+obj = MyDynamicProxy.new(“a string”)
+obj.reverse 	#”result:gnirts a”
+14. 扁平作用域
+使用闭包在两个作用域之间共享变量
+class C
+	def an_attribute
+		@attr
+	end
+end
+obj = C.new
+a_variable = 100
+obj.instance_eval do
+	@attr = a_variable
+end
+obj.an_attribute
+15.幽灵方法
+相应一个没有关联方法的消息
+class C
+	def method_missing(name,*args)
+		name.to_s,reverse
+	end
+end
+obj = C.new
+obj.ghost_method # dohtem_tsohg
+16.钩子方法
+通过覆写某个特殊方法来截获对象模型事件
+
+
+
+
+17.内核方法
+在Kernel模块定义一个方法，使之对所有对象都可用
+module Kernel
+	def a_method
+		“a kernal method”
+	end
+end
+a_method  	# a kernal method
+顶级上下文的self是main	self.class 是Object, Kernel在祖先链的位置在Object上方
+18.惰性实例变量
+当第一次访问一个实例变量时才对之进行初始化
+class C
+	def attribute
+		@attribute=@attribute || “some value”
+	end
+end
+obj = C.new
+obj.attribute		#some value
+19.拟态方法
+把一个方法伪装成另一个语言构件
+20.猴子补丁
+修改已有类的特性
+class String
+	def reverse
+		“override”
+	end
+end
+“abc”.reverse		# override
+21.有名参数
+把方法参数收集到一个哈希表中，以便通过名字访问
+def my_method(args)
+	args[:arg2]
+end
+my_method(:arg1 => “A”, :arg2 => “B”)	#B
+22.命名空间
+在一个模块中定义常量，以防止命名冲突
+module My
+	class Array
+		def to_s
+			“myclass”
+		end
+	end
+end
+Array.new
+My::Array.new
+23.空指针保护
+用“或”操作符复写一个空引用
+x=nil
+y=x || “a value”		#a value
+24.对象扩展
+通过给一个对象的eigenclass混入模块来定义单件方法
+obj = Object.new
+module M
+	def my_method
+		'a singleton method'
+	end
+end
+class<<obj
+	include M
+end
+obj.my_method	#a singleton method
+25.打开类
+修改已有的类
+class String
+	def my_string_method
+		“my method”
+	end
+end
+“abc”.my_string_method		#my method
+26.模式派发
+根据名字来选择需要调用的方法
+$x = 0
+class C
+	def my_first_method
+		$x += 1
+	end
+	def my_second_method
+		$x += 2
+	end
+end
+obj = C.new 
+obj.methods.each do |m|
+	obj.send(m)	if m.to_s =~ /^my_/
+end
+$x 		#3
+27.沙盒
+在一个安全的环境中执行未授信的代码
+
+28.作用域门
+用class  module 或def 关键字来隔离作用域
+a = 1
+defined? a 	#”local-variable”	defined?用来判断变量是否定义
+module MyModule
+	b = 1
+	defined? a 	#nil 
+	defined? 	b      #”local-variable”
+end
+defined? a 	#”local-variable”
+defined? b	#nil
+29.Self Yield
+把self 传给当前块
+class Person
+	attr_accessor :name, :surname
+	def	initialize
+		yield self
+	end
+end
+joe = Person.new do |p|
+	p.name = 'Joe'
+	p.surname = 'Smith'
+end
+30.共享作用域
+在同一个扁平作用域的多个上下文共享变量
+lambda {
+	shared = 10
+	self.class.class_eval do
+		define_method :counter do
+			shared
+		end
+		define_method :down do
+			shared -= 1
+		end
+	end
+}.call
+Counter		# 10
+3.times { down }
+Counter		# 7
+31.单件方法
+在一个对象上定义一个方法
+obj = “abc”
+class<<obj
+ 	def method
+		“method”
+	end
+end
+obj.method
+32.代码字符串
+执行一段表示Ruby代码的字符串
+eval(“1+3”)
+33.符号到代码块
+		
+
+
+
+
+
+		
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+
+
+
